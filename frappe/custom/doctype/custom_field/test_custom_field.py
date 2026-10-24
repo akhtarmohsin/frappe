@@ -15,6 +15,26 @@ from frappe.tests import IntegrationTestCase
 
 
 class TestCustomField(IntegrationTestCase):
+	def test_duplicate_label_is_rejected(self):
+		with self.assertRaises(frappe.ValidationError):
+			frappe.get_doc(
+				doctype="Custom Field",
+				dt="User",
+				label=" email ",
+				fieldtype="Data",
+				fieldname="custom_test_duplicate_label",
+			).insert()
+
+	def test_unique_label_is_allowed(self):
+		field = frappe.get_doc(
+			doctype="Custom Field",
+			dt="User",
+			label="Test Unique Label",
+			fieldtype="Data",
+			fieldname="custom_test_unique_label",
+		).insert()
+		self.addCleanup(frappe.delete_doc, "Custom Field", field.name)
+
 	def test_create_custom_fields(self):
 		create_custom_fields(
 			{

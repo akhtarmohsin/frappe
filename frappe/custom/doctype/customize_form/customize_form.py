@@ -13,7 +13,9 @@ import frappe.translate
 from frappe import _
 from frappe.core.doctype.doctype.doctype import (
 	check_email_append_to,
+	get_field_with_same_label,
 	get_fields_not_allowed_in_list_view,
+	throw_duplicate_label,
 	validate_autoincrement_autoname,
 	validate_fields_for_doctype,
 	validate_series,
@@ -228,6 +230,16 @@ class CustomizeForm(Document):
 		self.name = "Customize Form"
 
 	@frappe.whitelist()
+	def validate_unique_labels(self):
+		old_labels = {df.fieldname: df.label for df in frappe.get_meta(self.doc_type, cached=False).fields}
+
+		for df in self.fields:
+			if df.fieldname not in old_labels or old_labels[df.fieldname] == df.label:
+				continue
+			duplicate = get_field_with_same_label(df.label, self.fields, exclude=df.fieldname)
+			if duplicate:
+				throw_duplicate_label(self.doc_type, df.label, duplicate)
+
 	def save_customization(self):
 		if not self.doc_type:
 			return
@@ -236,6 +248,7 @@ class CustomizeForm(Document):
 		validate_autoincrement_autoname(self)
 		self.flags.update_db = False
 		self.flags.rebuild_doctype_for_global_search = False
+		self.validate_unique_labels()
 		self.update_custom_fields()
 		self.set_property_setters()
 		self.set_name_translation()

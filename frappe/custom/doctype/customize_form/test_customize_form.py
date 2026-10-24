@@ -167,6 +167,13 @@ class TestCustomizeForm(IntegrationTestCase):
 		frappe.delete_doc("Custom Field", custom_field_name)
 		self.assertEqual(frappe.db.get_value("Custom Field", custom_field_name), None)
 
+	def test_duplicate_label_is_rejected(self):
+		d = self.get_customize_form("Event")
+		other = next(df for df in d.fields if df.fieldname == "description")
+		target = next(df for df in d.fields if df.fieldname == "subject")
+		target.label = other.label
+		self.assertRaises(frappe.ValidationError, d.run_method, "save_customization")
+
 	def test_save_customization_remove_field(self):
 		d = self.get_customize_form("Event")
 		custom_field = d.get("fields", {"fieldname": self.field.fieldname})[0]

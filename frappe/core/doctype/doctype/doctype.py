@@ -188,6 +188,20 @@ class DocType(Document):
 		translated_doctype: DF.Check
 	# end: auto-generated types
 
+	def validate_unique_labels(self):
+		if frappe.flags.in_install or frappe.flags.in_migrate or frappe.flags.in_patch:
+			return
+
+		previous = self.get_doc_before_save()
+		old_labels = {df.fieldname: df.label for df in previous.get("fields")} if previous else {}
+
+		for df in self.get("fields"):
+			if old_labels.get(df.fieldname) == df.label:
+				continue
+			duplicate = get_field_with_same_label(df.label, self.get("fields"), exclude=df.fieldname)
+			if duplicate:
+				throw_duplicate_label(self.name, df.label, duplicate)
+
 	def validate(self):
 		"""Validate DocType before saving.
 
@@ -211,6 +225,7 @@ class DocType(Document):
 		self.set("can_change_name_type", validate_autoincrement_autoname(self))
 		self.validate_document_type()
 		validate_fields(self)
+		self.validate_unique_labels()
 		self.check_indexing_for_dashboard_links()
 		if not self.istable:
 			validate_permissions(self)
@@ -1350,6 +1365,32 @@ def validate_fields_for_doctype(doctype):
 	meta = frappe.get_meta(doctype, cached=False)
 	validate_links_table_fieldnames(meta)
 	validate_fields(meta)
+
+
+LAYOUT_FIELDTYPES = ("Section Break", "Column Break", "Tab Break")
+
+
+def get_field_with_same_label(label, fields, exclude):
+	if not label or not label.strip():
+		return None
+
+	label = label.strip().lower()
+	for df in fields:
+		if (
+			df.fieldname != exclude
+			and df.fieldtype not in LAYOUT_FIELDTYPES
+			and (df.label or "").strip().lower() == label
+		):
+			return df
+
+
+def throw_duplicate_label(doctype, label, duplicate):
+	frappe.throw(
+		_("{0}: Label {1} is already used by field {2}").format(
+			frappe.bold(doctype), frappe.bold(label), frappe.bold(duplicate.fieldname)
+		),
+		title=_("Duplicate Label"),
+	)
 
 
 # this is separate because it is also called via custom field

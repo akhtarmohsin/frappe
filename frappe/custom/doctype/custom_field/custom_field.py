@@ -215,6 +215,26 @@ class CustomField(Document):
 			self.translatable = 0
 
 		check_fieldname_conflicts(self)
+		self.validate_unique_label()
+
+	def validate_unique_label(self):
+		from frappe.core.doctype.doctype.doctype import (
+			LAYOUT_FIELDTYPES,
+			get_field_with_same_label,
+			throw_duplicate_label,
+		)
+
+		if self.fieldtype in LAYOUT_FIELDTYPES or frappe.flags.in_install or frappe.flags.in_patch:
+			return
+
+		previous = self.get_doc_before_save()
+		if previous and previous.label == self.label:
+			return
+
+		fields = frappe.get_meta(self.dt, cached=False).get("fields")
+		duplicate = get_field_with_same_label(self.label, fields, exclude=self.fieldname)
+		if duplicate:
+			throw_duplicate_label(self.dt, self.label, duplicate)
 
 	def on_update(self):
 		# validate field
